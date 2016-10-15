@@ -35,9 +35,12 @@ int BlueLedPin = 4;
 // pin 4 on the RGB shield is the blue led
 int GreenLedPin = 3;
 
+int maxSeen = -100;
 float distance;
+int lastRSSI = -50;
+int latch = 0;
 boolean songPlayed;
-float distThresh = 5;
+float distThresh = 70.0f;
 //////////Moving average
 
 
@@ -71,7 +74,7 @@ float n = (r2 - r1) / (10 * log10(d1 / d2));
 
 
 //Code for Twinkle Twinkle Little Star:
-int length = 15; // the number of notes
+int length = 5; // the number of notes
 char notes[] = "ccggaagffeeddc "; // a space represents a rest
 int beats[] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 4 };
 int tempo = 300;
@@ -171,7 +174,7 @@ void RFduinoBLE_onDisconnect()
   // don't play song if disconnecting. 
   analogWrite(RedLedPin, 0);
   analogWrite(BlueLedPin, 0);
-  analogWrite(GreenLedPin, 100);
+  analogWrite(GreenLedPin, 255);
  
 }
 
@@ -185,6 +188,14 @@ void RFduinoBLE_onDisconnect()
 // received signal strength indication (-0dBm to -127dBm)
 void RFduinoBLE_onRSSI(int rssi)
 {
+  if (rssi > maxSeen){
+    maxSeen = rssi;
+  }
+
+  if (maxSeen > -50){
+    maxSeen = -50;
+  }
+  
   // initialize average with instaneous value to counteract the initial smooth rise
   if (average == 1.0)
     average = rssi;
@@ -203,6 +214,7 @@ void RFduinoBLE_onRSSI(int rssi)
     d = d2;
   int intensity = (d2 - d) / (d2 - d1) * 255;
 
+  lastRSSI = rssi;
   doSongLogic();
   
   Serial.print((int)average);
@@ -215,19 +227,25 @@ void RFduinoBLE_onRSSI(int rssi)
 }
 
 void doSongLogic(void){
-  if (distance >= distThresh && songPlayed == 0){
-       Serial.println("PLAYING SONG!!!!");
+  if (lastRSSI <= maxSeen - 30 && songPlayed == 0){
+  //if (distance >= distThresh && songPlayed == 0){
+      Serial.println("PLAYING SONG!!!!");
       songPlayed = 1;
       playSongBlocking();
       analogWrite(RedLedPin, 128);
       analogWrite(BlueLedPin, 0);
       analogWrite(GreenLedPin, 128);
-    }
+      
+    } 
 
-    if (distance < distThresh){
+    if (lastRSSI > maxSeen - 2){
+
+    //if (distance < (distThresh-4.0)){
+      
        Serial.println("resetting SONG!!!!");
        songPlayed = 0; //Memory into switch
+       analogWrite(RedLedPin, 0);
+       analogWrite(BlueLedPin, 255);
+       analogWrite(GreenLedPin, 0);
     }
 }
-
-
